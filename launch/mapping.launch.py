@@ -31,11 +31,11 @@ def generate_launch_description():
         description='Yaml config file path'
     )
     decalre_config_file_cmd = DeclareLaunchArgument(
-        'config_file', default_value='mid360.yaml',
+        'config_file', default_value='ouster64.yaml',
         description='Config file'
     )
     declare_rviz_cmd = DeclareLaunchArgument(
-        'rviz', default_value='true',
+        'rviz', default_value='false',
         description='Use RViz to monitor results'
     )
     declare_rviz_config_path_cmd = DeclareLaunchArgument(

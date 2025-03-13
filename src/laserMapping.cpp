@@ -57,6 +57,9 @@
 #include <sensor_msgs/msg/imu.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #include <tf2_ros/transform_broadcaster.h>
+#include <tf2/LinearMath/Transform.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Vector3.h>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
 #include <livox_ros_driver2/msg/custom_msg.hpp>
@@ -352,6 +355,9 @@ void imu_cbk(const sensor_msgs::msg::Imu::UniquePtr msg_in)
     publish_count ++;
     // cout<<"IMU got at: "<<msg_in->header.stamp.toSec()<<endl;
     sensor_msgs::msg::Imu::SharedPtr msg(new sensor_msgs::msg::Imu(*msg_in));
+    odomAftMapped.twist.twist.angular.x = msg->angular_velocity.x;
+    odomAftMapped.twist.twist.angular.y = msg->angular_velocity.y;
+    odomAftMapped.twist.twist.angular.z = msg->angular_velocity.z;
     
 
     msg->header.stamp = get_ros_time(get_time_sec(msg_in->header.stamp) - time_diff_lidar_to_imu);
@@ -613,16 +619,31 @@ void save_to_pcd()
 }
 
 template<typename T>
-void set_posestamp(T & out)
+void set_odomstamp(T & out)
 {
-    out.pose.position.x = state_point.pos(0);
-    out.pose.position.y = state_point.pos(1);
-    out.pose.position.z = state_point.pos(2);
-    out.pose.orientation.x = geoQuat.x;
-    out.pose.orientation.y = geoQuat.y;
-    out.pose.orientation.z = geoQuat.z;
-    out.pose.orientation.w = geoQuat.w;
+    out.pose.pose.position.x = state_point.pos(0);
+    out.pose.pose.position.y = state_point.pos(1);
+    out.pose.pose.position.z = state_point.pos(2);
+    out.pose.pose.orientation.x = geoQuat.x;
+    out.pose.pose.orientation.y = geoQuat.y;
+    out.pose.pose.orientation.z = geoQuat.z;
+    out.pose.pose.orientation.w = geoQuat.w;
     
+    // Create tf2 transform
+    tf2::Transform world_to_body;
+    tf2::Quaternion q(geoQuat.x, geoQuat.y, geoQuat.z, geoQuat.w);
+    world_to_body.setRotation(q.inverse());
+    
+    // Create velocity vector in world frame
+    tf2::Vector3 vel_world(state_point.vel(0), state_point.vel(1), state_point.vel(2));
+    
+    // Transform velocity from world frame to body frame
+    tf2::Vector3 vel_body = world_to_body.getBasis() * vel_world;
+    
+    // Set velocity in odometry message
+    out.twist.twist.linear.x = vel_body.x();
+    out.twist.twist.linear.y = vel_body.y();
+    out.twist.twist.linear.z = vel_body.z();
 }
 
 void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pubOdomAftMapped, std::unique_ptr<tf2_ros::TransformBroadcaster> & tf_br)
@@ -630,7 +651,7 @@ void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPt
     odomAftMapped.header.frame_id = "camera_init";
     odomAftMapped.child_frame_id = "body";
     odomAftMapped.header.stamp = get_ros_time(lidar_end_time);
-    set_posestamp(odomAftMapped.pose);
+    set_odomstamp(odomAftMapped);
     pubOdomAftMapped->publish(odomAftMapped);
     auto P = kf.get_P();
     for (int i = 0; i < 6; i ++)
@@ -656,22 +677,6 @@ void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPt
     trans.transform.rotation.y = odomAftMapped.pose.pose.orientation.y;
     trans.transform.rotation.z = odomAftMapped.pose.pose.orientation.z;
     tf_br->sendTransform(trans);
-}
-
-void publish_path(rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubPath)
-{
-    set_posestamp(msg_body_pose);
-    msg_body_pose.header.stamp = get_ros_time(lidar_end_time); // ros::Time().fromSec(lidar_end_time);
-    msg_body_pose.header.frame_id = "camera_init";
-
-    /*** if path is too large, the rvis will crash ***/
-    static int jjj = 0;
-    jjj++;
-    if (jjj % 10 == 0) 
-    {
-        path.poses.push_back(msg_body_pose);
-        pubPath->publish(path);
-    }
 }
 
 void h_share_model(state_ikfom &s, esekfom::dyn_share_datastruct<double> &ekfom_data)
@@ -1069,7 +1074,6 @@ private:
             t5 = omp_get_wtime();
             
             /******* Publish points *******/
-            if (path_en)                         publish_path(pubPath_);
             if (scan_pub_en)      publish_frame_world(pubLaserCloudFull_);
             if (scan_pub_en && scan_body_pub_en) publish_frame_body(pubLaserCloudFull_body_);
             if (effect_pub_en) publish_effect_world(pubLaserCloudEffect_);
