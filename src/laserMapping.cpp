@@ -917,7 +917,7 @@ public:
         pubLaserCloudFull_body_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/fast_lio2/cloud_registered_body", 20);
         pubLaserCloudEffect_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/fast_lio2/cloud_effected", 20);
         pubLaserCloudMap_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/fast_lio2/map", 20);
-        pubOdomAftMapped_ = this->create_publisher<nav_msgs::msg::Odometry>("/state_estimation/odom", 20);
+        pubOdomAftMapped_ = this->create_publisher<nav_msgs::msg::Odometry>("/state_estimation/odometry_raw", 20);
         pubPath_ = this->create_publisher<nav_msgs::msg::Path>("/fast_lio2/path", 20);
 
         //------------------------------------------------------------------------------------------------------
