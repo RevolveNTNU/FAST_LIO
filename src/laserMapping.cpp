@@ -604,12 +604,6 @@ void publish_map(rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub
     laserCloudmsg.header.stamp = get_ros_time(lidar_end_time);
     laserCloudmsg.header.frame_id = "odom";
     pubLaserCloudMap->publish(laserCloudmsg);
-
-    // sensor_msgs::msg::PointCloud2 laserCloudMap;
-    // pcl::toROSMsg(*featsFromMap, laserCloudMap);
-    // laserCloudMap.header.stamp = get_ros_time(lidar_end_time);
-    // laserCloudMap.header.frame_id = "odom";
-    // pubLaserCloudMap->publish(laserCloudMap);
 }
 
 void save_to_pcd()
@@ -646,7 +640,7 @@ void set_odomstamp(T & out)
     out.twist.twist.linear.z = vel_body.z();
 }
 
-void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pubOdomAftMapped, std::unique_ptr<tf2_ros::TransformBroadcaster> & tf_br)
+void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pubOdomAftMapped)
 {
     odomAftMapped.header.frame_id = "odom";
     odomAftMapped.child_frame_id = "base_link";
@@ -664,19 +658,6 @@ void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPt
         odomAftMapped.pose.covariance[i*6 + 5] = P(k, 2);
     }
     pubOdomAftMapped->publish(odomAftMapped);
-
-    geometry_msgs::msg::TransformStamped trans;
-    trans.header.frame_id = "odom";
-    trans.child_frame_id = "base_link";
-    trans.header.stamp = get_ros_time(lidar_end_time);
-    trans.transform.translation.x = odomAftMapped.pose.pose.position.x;
-    trans.transform.translation.y = odomAftMapped.pose.pose.position.y;
-    trans.transform.translation.z = odomAftMapped.pose.pose.position.z;
-    trans.transform.rotation.w = odomAftMapped.pose.pose.orientation.w;
-    trans.transform.rotation.x = odomAftMapped.pose.pose.orientation.x;
-    trans.transform.rotation.y = odomAftMapped.pose.pose.orientation.y;
-    trans.transform.rotation.z = odomAftMapped.pose.pose.orientation.z;
-    tf_br->sendTransform(trans);
 }
 
 void h_share_model(state_ikfom &s, esekfom::dyn_share_datastruct<double> &ekfom_data)
@@ -938,7 +919,6 @@ public:
         pubLaserCloudMap_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/fast_lio2/map", 20);
         pubOdomAftMapped_ = this->create_publisher<nav_msgs::msg::Odometry>("/state_estimation/odom", 20);
         pubPath_ = this->create_publisher<nav_msgs::msg::Path>("/fast_lio2/path", 20);
-        tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
         //------------------------------------------------------------------------------------------------------
         auto period_ms = std::chrono::milliseconds(static_cast<int64_t>(1000.0 / 100.0));
@@ -1066,7 +1046,7 @@ private:
             double t_update_end = omp_get_wtime();
 
             /******* Publish odometry *******/
-            publish_odometry(pubOdomAftMapped_, tf_broadcaster_);
+            publish_odometry(pubOdomAftMapped_);
 
             /*** add the feature points to map kdtree ***/
             t3 = omp_get_wtime();
@@ -1142,7 +1122,6 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_pcl_pc_;
     rclcpp::Subscription<livox_ros_driver2::msg::CustomMsg>::SharedPtr sub_pcl_livox_;
 
-    std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::TimerBase::SharedPtr map_pub_timer_;
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr map_save_srv_;
