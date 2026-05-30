@@ -83,6 +83,7 @@ float res_last[100000] = {0.0};
 float DET_RANGE = 300.0f;
 const float MOV_THRESHOLD = 1.5f;
 double time_diff_lidar_to_imu = 0.0;
+double imu_acc_z_offset = 0.0;
 
 mutex mtx_buffer;
 condition_variable sig_buffer;
@@ -317,6 +318,7 @@ void imu_cbk(const sensor_msgs::msg::Imu::UniquePtr msg_in)
     publish_count ++;
     // cout<<"IMU got at: "<<msg_in->header.stamp.toSec()<<endl;
     sensor_msgs::msg::Imu::SharedPtr msg(new sensor_msgs::msg::Imu(*msg_in));
+    msg->linear_acceleration.z += imu_acc_z_offset;
     odomAftMapped.twist.twist.angular.x = msg->angular_velocity.x;
     odomAftMapped.twist.twist.angular.y = msg->angular_velocity.y;
     odomAftMapped.twist.twist.angular.z = msg->angular_velocity.z;
@@ -758,6 +760,7 @@ public:
         this->declare_parameter<string>("common.imu_topic", "/sensor/imu_0");
         this->declare_parameter<bool>("common.time_sync_en", false);
         this->declare_parameter<double>("common.time_offset_lidar_to_imu", 0.0);
+        this->declare_parameter<double>("common.imu_acc_z_offset", 0.0);
         this->declare_parameter<double>("filter_size_corner", 0.5);
         this->declare_parameter<double>("filter_size_surf", 0.5);
         this->declare_parameter<double>("filter_size_map", 0.5);
@@ -794,6 +797,7 @@ public:
         this->get_parameter_or<string>("common.imu_topic", imu_topic,"/sensor/imu_0");
         this->get_parameter_or<bool>("common.time_sync_en", time_sync_en, false);
         this->get_parameter_or<double>("common.time_offset_lidar_to_imu", time_diff_lidar_to_imu, 0.0);
+        this->get_parameter_or<double>("common.imu_acc_z_offset", imu_acc_z_offset, 0.0);
         this->get_parameter_or<double>("filter_size_corner",filter_size_corner_min,0.5);
         this->get_parameter_or<double>("filter_size_surf",filter_size_surf_min,0.5);
         this->get_parameter_or<double>("filter_size_map",filter_size_map_min,0.5);
